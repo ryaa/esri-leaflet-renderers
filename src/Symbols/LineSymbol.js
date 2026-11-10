@@ -7,6 +7,7 @@ export var LineSymbol = Symbol.extend({
   },
   initialize: function (symbolJson, options) {
     Symbol.prototype.initialize.call(this, symbolJson, options);
+    this._marker = this._symbolJson && this._symbolJson.marker;
     this._fillStyles();
   },
 
