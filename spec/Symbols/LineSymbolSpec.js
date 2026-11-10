@@ -25,7 +25,11 @@ describe('LineSymbol', function () {
           'type': 'esriSLS',
           'style': 'esriSLSSolid',
           'color': [255, 85, 0, 255],
-          'width': 1.4
+          'width': 1.4,
+          'marker': {
+            'style': 'arrow',
+            'placement': 'end'
+          }
         };
       });
 
@@ -38,6 +42,8 @@ describe('LineSymbol', function () {
         expect(styles.opacity).to.be.eq(o);
         expect(styles.dashArray).to.be.equal(undefined);
         expect(styles.weight).to.be.eq(symbolHelper.pixelValue(solidLine.width));
+
+        expect(symbol._marker).to.be.deep.eq(solidLine.marker);
       });
 
       it('should set weight to 0 if width is 0', function () {

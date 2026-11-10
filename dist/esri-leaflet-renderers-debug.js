@@ -1,11 +1,11 @@
-/* esri-leaflet-renderers - v3.0.1 - Tue Oct 03 2023 15:39:10 GMT+0200 (Eastern European Standard Time)
- * Copyright (c) 2023 Environmental Systems Research Institute, Inc.
+/* esri-leaflet-renderers - v3.0.1 - Mon Nov 09 2026 17:45:30 GMT+0500 (Kazakhstan Time)
+ * Copyright (c) 2026 Environmental Systems Research Institute, Inc.
  * Apache-2.0 */
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('leaflet'), require('esri-leaflet'), require('esri-leaflet-cluster')) :
   typeof define === 'function' && define.amd ? define(['exports', 'leaflet', 'esri-leaflet', 'esri-leaflet-cluster'], factory) :
   (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory((global.L = global.L || {}, global.L.esri = global.L.esri || {}, global.L.esri.Renderers = {}), global.L, global.L.esri, global.L.esri.Cluster));
-})(this, (function (exports, L, EsriLeaflet, EsriLeafletCluster) { 'use strict';
+})(this, (function (exports, L$1, EsriLeaflet, EsriLeafletCluster) { 'use strict';
 
   function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
 
@@ -27,11 +27,11 @@
     return Object.freeze(n);
   }
 
-  var L__default = /*#__PURE__*/_interopDefaultLegacy(L);
+  var L__default = /*#__PURE__*/_interopDefaultLegacy(L$1);
   var EsriLeaflet__namespace = /*#__PURE__*/_interopNamespace(EsriLeaflet);
   var EsriLeafletCluster__default = /*#__PURE__*/_interopDefaultLegacy(EsriLeafletCluster);
 
-  var Symbol = L.Class.extend({
+  var Symbol = L$1.Class.extend({
     initialize: function (symbolJson, options) {
       this._symbolJson = symbolJson;
       this.val = null;
@@ -555,7 +555,7 @@
         yOffset += this.pixelValue(options.yoffset);
       }
 
-      var icon = L.icon({
+      var icon = L$1.icon({
         iconUrl: this._iconUrl,
         iconSize: [width, height],
         iconAnchor: [xOffset, yOffset]
@@ -592,23 +592,23 @@
       }
 
       if (this._symbolJson.type === 'esriPMS') {
-        var layerOptions = L.extend({}, { icon: this._getIcon(size) }, options);
-        return L.marker(latlng, layerOptions);
+        var layerOptions = L$1.extend({}, { icon: this._getIcon(size) }, options);
+        return L$1.marker(latlng, layerOptions);
       }
       size = this.pixelValue(size);
 
       switch (this._symbolJson.style) {
         case 'esriSMSSquare':
-          return squareMarker(latlng, size, L.extend({}, this._styles, options));
+          return squareMarker(latlng, size, L$1.extend({}, this._styles, options));
         case 'esriSMSDiamond':
-          return diamondMarker(latlng, size, L.extend({}, this._styles, options));
+          return diamondMarker(latlng, size, L$1.extend({}, this._styles, options));
         case 'esriSMSCross':
-          return crossMarker(latlng, size, L.extend({}, this._styles, options));
+          return crossMarker(latlng, size, L$1.extend({}, this._styles, options));
         case 'esriSMSX':
-          return xMarker(latlng, size, L.extend({}, this._styles, options));
+          return xMarker(latlng, size, L$1.extend({}, this._styles, options));
       }
       this._styles.radius = size / 2.0;
-      return L.circleMarker(latlng, L.extend({}, this._styles, options));
+      return L$1.circleMarker(latlng, L$1.extend({}, this._styles, options));
     }
   });
 
@@ -623,6 +623,7 @@
     },
     initialize: function (symbolJson, options) {
       Symbol.prototype.initialize.call(this, symbolJson, options);
+      this._marker = this._symbolJson && this._symbolJson.marker;
       this._fillStyles();
     },
 
@@ -759,7 +760,7 @@
     return new PolygonSymbol(symbolJson, options);
   }
 
-  var Renderer = L.Class.extend({
+  var Renderer = L$1.Class.extend({
     options: {
       proportionalPolygon: false,
       clickable: true
@@ -770,7 +771,7 @@
       this._pointSymbols = false;
       this._symbols = [];
       this._visualVariables = this._parseVisualVariables(rendererJson.visualVariables);
-      L.Util.setOptions(this, options);
+      L$1.Util.setOptions(this, options);
     },
 
     _parseVisualVariables: function (visualVariables) {
@@ -809,9 +810,9 @@
 
     attachStylesToLayer: function (layer) {
       if (this._pointSymbols) {
-        layer.options.pointToLayer = L.Util.bind(this.pointToLayer, this);
+        layer.options.pointToLayer = L$1.Util.bind(this.pointToLayer, this);
       } else {
-        layer.options.style = L.Util.bind(this.style, this);
+        layer.options.style = L$1.Util.bind(this.style, this);
         layer._originalStyle = layer.options.style;
       }
     },
@@ -823,7 +824,7 @@
         return sym.pointToLayer(geojson, latlng, this._visualVariables, this.options);
       }
       // invisible symbology
-      return L.circleMarker(latlng, { radius: 0, opacity: 0 });
+      return L$1.circleMarker(latlng, { radius: 0, opacity: 0 });
     },
 
     style: function (feature) {
@@ -998,30 +999,609 @@
     return new SimpleRenderer(rendererJson, options);
   }
 
-  function wireUpRenderers () {
+  // functional re-impl of L.Point.distanceTo,
+  // with no dependency on Leaflet for easier testing
+  function pointDistance(ptA, ptB) {
+  	const x = ptB.x - ptA.x;
+  	const y = ptB.y - ptA.y;
+  	return Math.sqrt(x * x + y * y);
+  }
+
+  const computeSegmentHeading = (a, b) =>
+      ((Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI) + 90 + 360) % 360;
+
+  const asRatioToPathLength = ({ value, isInPixels }, totalPathLength) =>
+      isInPixels ? value / totalPathLength : value;
+
+  function parseRelativeOrAbsoluteValue(value) {
+      if (typeof value === 'string' && value.indexOf('%') !== -1) {
+          return {
+              value: parseFloat(value) / 100,
+              isInPixels: false,
+          };
+      }
+      const parsedValue = value ? parseFloat(value) : 0;
+      return {
+          value: parsedValue,
+          isInPixels: parsedValue > 0,
+      };
+  }
+
+  const pointsEqual = (a, b) => a.x === b.x && a.y === b.y;
+
+  function pointsToSegments(pts) {
+      return pts.reduce((segments, b, idx, points) => {
+          // this test skips same adjacent points
+          if (idx > 0 && !pointsEqual(b, points[idx - 1])) {
+              const a = points[idx - 1];
+              const distA = segments.length > 0 ? segments[segments.length - 1].distB : 0;
+              const distAB = pointDistance(a, b);
+              segments.push({
+                  a,
+                  b,
+                  distA,
+                  distB: distA + distAB,
+                  heading: computeSegmentHeading(a, b),
+              });
+          }
+          return segments;
+      }, []);
+  }
+
+  function projectPatternOnPointPath(pts, pattern) {
+      // 1. split the path into segment infos
+      const segments = pointsToSegments(pts);
+      const nbSegments = segments.length;
+      if (nbSegments === 0) { return []; }
+
+      const totalPathLength = segments[nbSegments - 1].distB;
+
+      const offset = asRatioToPathLength(pattern.offset, totalPathLength);
+      const endOffset = asRatioToPathLength(pattern.endOffset, totalPathLength);
+      const repeat = asRatioToPathLength(pattern.repeat, totalPathLength);
+
+      const repeatIntervalPixels = totalPathLength * repeat;
+      const startOffsetPixels = offset > 0 ? totalPathLength * offset : 0;
+      const endOffsetPixels = endOffset > 0 ? totalPathLength * endOffset : 0;
+
+      // 2. generate the positions of the pattern as offsets from the path start
+      const positionOffsets = [];
+      let positionOffset = startOffsetPixels;
+      do {
+          positionOffsets.push(positionOffset);
+          positionOffset += repeatIntervalPixels;
+      } while(repeatIntervalPixels > 0 && positionOffset < totalPathLength - endOffsetPixels);
+
+      // 3. projects offsets to segments
+      let segmentIndex = 0;
+      let segment = segments[0];
+      return positionOffsets.map(positionOffset => {
+          // find the segment matching the offset,
+          // starting from the previous one as offsets are ordered
+          while (positionOffset > segment.distB && segmentIndex < nbSegments - 1) {
+              segmentIndex++;
+              segment = segments[segmentIndex];
+          }
+
+          const segmentRatio = (positionOffset - segment.distA) / (segment.distB - segment.distA);
+          return {
+              pt: interpolateBetweenPoints(segment.a, segment.b, segmentRatio),
+              heading: segment.heading,
+          };
+      });
+  }
+
+  /**
+  * Finds the point which lies on the segment defined by points A and B,
+  * at the given ratio of the distance from A to B, by linear interpolation.
+  */
+  function interpolateBetweenPoints(ptA, ptB, ratio) {
+      if (ptB.x !== ptA.x) {
+          return {
+              x: ptA.x + ratio * (ptB.x - ptA.x),
+              y: ptA.y + ratio * (ptB.y - ptA.y),
+          };
+      }
+      // special case where points lie on the same vertical axis
+      return {
+          x: ptA.x,
+          y: ptA.y + (ptB.y - ptA.y) * ratio,
+      };
+  }
+
+  (function() {
+      // save these original methods before they are overwritten
+      var proto_initIcon = L.Marker.prototype._initIcon;
+      var proto_setPos = L.Marker.prototype._setPos;
+
+      var oldIE = (L.DomUtil.TRANSFORM === 'msTransform');
+
+      L.Marker.addInitHook(function () {
+          var iconOptions = this.options.icon && this.options.icon.options;
+          var iconAnchor = iconOptions && this.options.icon.options.iconAnchor;
+          if (iconAnchor) {
+              iconAnchor = (iconAnchor[0] + 'px ' + iconAnchor[1] + 'px');
+          }
+          this.options.rotationOrigin = this.options.rotationOrigin || iconAnchor || 'center bottom' ;
+          this.options.rotationAngle = this.options.rotationAngle || 0;
+
+          // Ensure marker keeps rotated during dragging
+          this.on('drag', function(e) { e.target._applyRotation(); });
+      });
+
+      L.Marker.include({
+          _initIcon: function() {
+              proto_initIcon.call(this);
+          },
+
+          _setPos: function (pos) {
+              proto_setPos.call(this, pos);
+              this._applyRotation();
+          },
+
+          _applyRotation: function () {
+              if(this.options.rotationAngle) {
+                  this._icon.style[L.DomUtil.TRANSFORM+'Origin'] = this.options.rotationOrigin;
+
+                  if(oldIE) {
+                      // for IE 9, use the 2D rotation
+                      this._icon.style[L.DomUtil.TRANSFORM] = 'rotate(' + this.options.rotationAngle + 'deg)';
+                  } else {
+                      // for modern browsers, prefer the 3D accelerated version
+                      this._icon.style[L.DomUtil.TRANSFORM] += ' rotateZ(' + this.options.rotationAngle + 'deg)';
+                  }
+              }
+          },
+
+          setRotationAngle: function(angle) {
+              this.options.rotationAngle = angle;
+              this.update();
+              return this;
+          },
+
+          setRotationOrigin: function(origin) {
+              this.options.rotationOrigin = origin;
+              this.update();
+              return this;
+          }
+      });
+  })();
+
+  /**
+  * Defines several classes of symbol factories,
+  * to be used with L.PolylineDecorator
+  */
+
+  L__default["default"].Symbol = L__default["default"].Symbol || {};
+
+  /**
+  * A simple dash symbol, drawn as a Polyline.
+  * Can also be used for dots, if 'pixelSize' option is given the 0 value.
+  */
+  L__default["default"].Symbol.Dash = L__default["default"].Class.extend({
+      options: {
+          pixelSize: 10,
+          pathOptions: { }
+      },
+
+      initialize: function (options) {
+          L__default["default"].Util.setOptions(this, options);
+          this.options.pathOptions.clickable = false;
+      },
+
+      buildSymbol: function(dirPoint, latLngs, map, index, total) {
+          const opts = this.options;
+          const d2r = Math.PI / 180;
+
+          // for a dot, nothing more to compute
+          if(opts.pixelSize <= 1) {
+              return L__default["default"].polyline([dirPoint.latLng, dirPoint.latLng], opts.pathOptions);
+          }
+
+          const midPoint = map.project(dirPoint.latLng);
+          const angle = (-(dirPoint.heading - 90)) * d2r;
+          const a = L__default["default"].point(
+              midPoint.x + opts.pixelSize * Math.cos(angle + Math.PI) / 2,
+              midPoint.y + opts.pixelSize * Math.sin(angle) / 2
+          );
+          // compute second point by central symmetry to avoid unecessary cos/sin
+          const b = midPoint.add(midPoint.subtract(a));
+          return L__default["default"].polyline([map.unproject(a), map.unproject(b)], opts.pathOptions);
+      }
+  });
+
+  L__default["default"].Symbol.dash = function (options) {
+      return new L__default["default"].Symbol.Dash(options);
+  };
+
+  L__default["default"].Symbol.ArrowHead = L__default["default"].Class.extend({
+      options: {
+          polygon: true,
+          pixelSize: 10,
+          headAngle: 60,
+          pathOptions: {
+              stroke: false,
+              weight: 2
+          }
+      },
+
+      initialize: function (options) {
+          L__default["default"].Util.setOptions(this, options);
+          this.options.pathOptions.clickable = false;
+      },
+
+      buildSymbol: function(dirPoint, latLngs, map, index, total) {
+          return this.options.polygon
+              ? L__default["default"].polygon(this._buildArrowPath(dirPoint, map), this.options.pathOptions)
+              : L__default["default"].polyline(this._buildArrowPath(dirPoint, map), this.options.pathOptions);
+      },
+
+      _buildArrowPath: function (dirPoint, map) {
+          const d2r = Math.PI / 180;
+          const tipPoint = map.project(dirPoint.latLng);
+          const direction = (-(dirPoint.heading - 90)) * d2r;
+          const radianArrowAngle = this.options.headAngle / 2 * d2r;
+
+          const headAngle1 = direction + radianArrowAngle;
+          const headAngle2 = direction - radianArrowAngle;
+          const arrowHead1 = L__default["default"].point(
+              tipPoint.x - this.options.pixelSize * Math.cos(headAngle1),
+              tipPoint.y + this.options.pixelSize * Math.sin(headAngle1));
+          const arrowHead2 = L__default["default"].point(
+              tipPoint.x - this.options.pixelSize * Math.cos(headAngle2),
+              tipPoint.y + this.options.pixelSize * Math.sin(headAngle2));
+
+          return [
+              map.unproject(arrowHead1),
+              dirPoint.latLng,
+              map.unproject(arrowHead2)
+          ];
+      }
+  });
+
+  L__default["default"].Symbol.arrowHead = function (options) {
+      return new L__default["default"].Symbol.ArrowHead(options);
+  };
+
+  L__default["default"].Symbol.Marker = L__default["default"].Class.extend({
+      options: {
+          markerOptions: { },
+          rotate: false
+      },
+
+      initialize: function (options) {
+          L__default["default"].Util.setOptions(this, options);
+          this.options.markerOptions.clickable = false;
+          this.options.markerOptions.draggable = false;
+      },
+
+      buildSymbol: function(directionPoint, latLngs, map, index, total) {
+          if(this.options.rotate) {
+              this.options.markerOptions.rotationAngle = directionPoint.heading + (this.options.angleCorrection || 0);
+          }
+          return L__default["default"].marker(directionPoint.latLng, this.options.markerOptions);
+      }
+  });
+
+  L__default["default"].Symbol.marker = function (options) {
+      return new L__default["default"].Symbol.Marker(options);
+  };
+
+  const isCoord = c =>
+      (c instanceof L__default["default"].LatLng) ||
+      (Array.isArray(c) && c.length === 2 && typeof c[0] === 'number');
+
+  const isCoordArray = ll => Array.isArray(ll) && isCoord(ll[0]);
+
+  L__default["default"].PolylineDecorator = L__default["default"].FeatureGroup.extend({
+      options: {
+          patterns: []
+      },
+
+      initialize: function(paths, options) {
+          L__default["default"].FeatureGroup.prototype.initialize.call(this);
+          L__default["default"].Util.setOptions(this, options);
+          this._map = null;
+          this._paths = this._initPaths(paths);
+          this._bounds = this._initBounds();
+          this._patterns = this._initPatterns(this.options.patterns);
+      },
+
+      /**
+      * Deals with all the different cases. input can be one of these types:
+      * array of LatLng, array of 2-number arrays, Polyline, Polygon,
+      * array of one of the previous.
+      */
+      _initPaths: function(input, isPolygon) {
+          if (isCoordArray(input)) {
+              // Leaflet Polygons don't need the first point to be repeated, but we do
+              const coords = isPolygon ? input.concat([input[0]]) : input;
+              return [coords];
+          }
+          if (input instanceof L__default["default"].Polyline) {
+              // we need some recursivity to support multi-poly*
+              return this._initPaths(input.getLatLngs(), (input instanceof L__default["default"].Polygon));
+          }
+          if (Array.isArray(input)) {
+              // flatten everything, we just need coordinate lists to apply patterns
+              return input.reduce((flatArray, p) =>
+                  flatArray.concat(this._initPaths(p, isPolygon)),
+              []);
+          }
+          return [];
+      },
+
+      // parse pattern definitions and precompute some values
+      _initPatterns: function(patternDefs) {
+          return patternDefs.map(this._parsePatternDef);
+      },
+
+      /**
+      * Changes the patterns used by this decorator
+      * and redraws the new one.
+      */
+      setPatterns: function(patterns) {
+          this.options.patterns = patterns;
+          this._patterns = this._initPatterns(this.options.patterns);
+          this.redraw();
+      },
+
+      /**
+      * Changes the patterns used by this decorator
+      * and redraws the new one.
+      */
+      setPaths: function(paths) {
+          this._paths = this._initPaths(paths);
+          this._bounds = this._initBounds();
+          this.redraw();
+      },
+
+      /**
+      * Parse the pattern definition
+      */
+      _parsePatternDef: function(patternDef, latLngs) {
+          return {
+              symbolFactory: patternDef.symbol,
+              // Parse offset and repeat values, managing the two cases:
+              // absolute (in pixels) or relative (in percentage of the polyline length)
+              offset: parseRelativeOrAbsoluteValue(patternDef.offset),
+              endOffset: parseRelativeOrAbsoluteValue(patternDef.endOffset),
+              repeat: parseRelativeOrAbsoluteValue(patternDef.repeat),
+          };
+      },
+
+      onAdd: function (map) {
+          this._map = map;
+          this._draw();
+          this._map.on('moveend', this.redraw, this);
+      },
+
+      onRemove: function (map) {
+          this._map.off('moveend', this.redraw, this);
+          this._map = null;
+          L__default["default"].FeatureGroup.prototype.onRemove.call(this, map);
+      },
+
+      /**
+      * As real pattern bounds depends on map zoom and bounds,
+      * we just compute the total bounds of all paths decorated by this instance.
+      */
+      _initBounds: function() {
+          const allPathCoords = this._paths.reduce((acc, path) => acc.concat(path), []);
+          return L__default["default"].latLngBounds(allPathCoords);
+      },
+
+      getBounds: function() {
+          return this._bounds;
+      },
+
+      /**
+      * Returns an array of ILayers object
+      */
+      _buildSymbols: function(latLngs, symbolFactory, directionPoints) {
+          return directionPoints.map((directionPoint, i) =>
+              symbolFactory.buildSymbol(directionPoint, latLngs, this._map, i, directionPoints.length)
+          );
+      },
+
+      /**
+      * Compute pairs of LatLng and heading angle,
+      * that define positions and directions of the symbols on the path
+      */
+      _getDirectionPoints: function(latLngs, pattern) {
+          if (latLngs.length < 2) {
+              return [];
+          }
+          const pathAsPoints = latLngs.map(latLng => this._map.project(latLng));
+          return projectPatternOnPointPath(pathAsPoints, pattern)
+              .map(point => ({
+                  latLng: this._map.unproject(L__default["default"].point(point.pt)),
+                  heading: point.heading,
+              }));
+      },
+
+      redraw: function() {
+          if (!this._map) {
+              return;
+          }
+          this.clearLayers();
+          this._draw();
+      },
+
+      /**
+      * Returns all symbols for a given pattern as an array of FeatureGroup
+      */
+      _getPatternLayers: function(pattern) {
+          const mapBounds = this._map.getBounds().pad(0.1);
+          return this._paths.map(path => {
+              const directionPoints = this._getDirectionPoints(path, pattern)
+                  // filter out invisible points
+                  .filter(point => mapBounds.contains(point.latLng));
+              return L__default["default"].featureGroup(this._buildSymbols(path, pattern.symbolFactory, directionPoints));
+          });
+      },
+
+      /**
+      * Draw all patterns
+      */
+      _draw: function () {
+          this._patterns
+              .map(pattern => this._getPatternLayers(pattern))
+              .forEach(layers => { this.addLayer(L__default["default"].featureGroup(layers)); });
+      }
+  });
+  /*
+   * Allows compact syntax to be used
+   */
+  L__default["default"].polylineDecorator = function (paths, options) {
+      return new L__default["default"].PolylineDecorator(paths, options);
+  };
+
+  function getPlacements(placement) {
+    switch (placement) {
+      case "begin":
+        return [0];
+
+      case "end":
+        return ["100%"];
+
+      case "begin-end":
+        return [0, "100%"];
+
+      default:
+        return [];
+    }
+  }
+
+  function getArrowPatterns(marker, symbol, styles) {
+    var placements = getPlacements(marker.placement || "end");
+
+    if (!placements.length) {
+      return [];
+    }
+
+    var color = styles.color || "#3388ff";
+    var opacity = styles.opacity === undefined ? 1 : styles.opacity;
+
+    if (marker.color) {
+      color = symbol.colorValue(marker.color);
+      opacity = symbol.alphaValue(marker.color);
+    }
+
+    // ArcGIS size is expressed in points; Leaflet uses pixels.
+    var pixelSize = !isNaN(marker.size) ? symbol.pixelValue(marker.size) : 15;
+
+    var arrow = L__default["default"].Symbol.arrowHead({
+      pixelSize: pixelSize,
+      polygon: true,
+      pathOptions: {
+        stroke: false,
+        fill: true,
+        color: color,
+        fillColor: color,
+        opacity: opacity,
+        fillOpacity: opacity,
+        interactive: false,
+      },
+    });
+
+    return placements.map(function (offset) {
+      return {
+        offset: offset,
+        repeat: 0,
+        symbol: arrow,
+      };
+    });
+  }
+
+  function attachArrowMarker(layer, feature, renderer) {
+    if (!layer || !renderer || !feature.geometry) {
+      return null;
+    }
+
+    var geometryType = feature.geometry.type;
+
+    if (geometryType !== "LineString" && geometryType !== "MultiLineString") {
+      return null;
+    }
+
+    var symbol = renderer._getSymbol(feature);
+
+    if (!symbol || !symbol._marker || symbol._marker.style !== "arrow") {
+      return null;
+    }
+
+    var marker = symbol._marker;
+    var initialStyles = renderer.style(feature);
+
+    var decorator = L__default["default"].polylineDecorator(layer, {
+      patterns: getArrowPatterns(marker, symbol, initialStyles),
+    });
+
+    // Keep decorator synchronized with the feature's style.
+    // FeatureLayer calls setStyle() when applying renderer styles.
+    var originalSetStyle = layer.setStyle;
+
+    if (originalSetStyle) {
+      layer.setStyle = function (styles) {
+        originalSetStyle.call(this, styles);
+
+        decorator.setPatterns(getArrowPatterns(marker, symbol, styles || {}));
+
+        return this;
+      };
+    }
+
+    // A feature can be removed from the map and added again because
+    // FeatureLayer caches layers between viewport requests.
+    layer.on("add", function () {
+      if (layer._map && decorator._map !== layer._map) {
+        if (decorator._map) {
+          decorator.remove();
+        }
+
+        decorator.addTo(layer._map);
+      }
+    });
+
+    layer.on("remove", function () {
+      if (decorator._map) {
+        decorator.remove();
+      }
+    });
+
+    return decorator;
+  }
+
+  function wireUpRenderers() {
     if (this.options.ignoreRenderer) {
       return;
     }
-    var oldOnAdd = L.Util.bind(this.onAdd, this);
-    var oldUnbindPopup = L.Util.bind(this.unbindPopup, this);
-    var oldOnRemove = L.Util.bind(this.onRemove, this);
+    var oldOnAdd = L$1.Util.bind(this.onAdd, this);
+    var oldUnbindPopup = L$1.Util.bind(this.unbindPopup, this);
+    var oldOnRemove = L$1.Util.bind(this.onRemove, this);
+    var oldUpdateLayer = L$1.Util.bind(this._updateLayer, this);
 
-    L.Util.bind(this.createNewLayer, this);
+    L$1.Util.bind(this.createNewLayer, this);
 
     this.onAdd = function (map) {
       this.metadata(function (error, response) {
         if (error) {
-          console.warn('failed to load metadata from the service.');
+          console.warn("failed to load metadata from the service.");
           return;
-        } if (response && response.drawingInfo) {
+        }
+        if (response && response.drawingInfo) {
           if (this.options.drawingInfo) {
             // allow L.esri.webmap (and others) to override service symbology with info provided in layer constructor
             response.drawingInfo = this.options.drawingInfo;
           }
 
           // the default pane for lines and polygons is 'overlayPane', for points it is 'markerPane'
-          if (this.options.pane === 'overlayPane' && response.geometryType === 'esriGeometryPoint') {
-            this.options.pane = 'markerPane';
+          if (
+            this.options.pane === "overlayPane" &&
+            response.geometryType === "esriGeometryPoint"
+          ) {
+            this.options.pane = "markerPane";
           }
 
           this._setRenderers(response);
@@ -1051,6 +1631,14 @@
       }
     };
 
+    this._updateLayer = function (layer, geojson) {
+      oldUpdateLayer(layer, geojson);
+
+      if (layer && layer._esriArrowDecorator) {
+        layer._esriArrowDecorator.setPaths(layer);
+      }
+    };
+
     this._addPointLayer = function (map) {
       if (this._pointLayer) {
         this._pointLayer.addTo(map);
@@ -1060,7 +1648,7 @@
 
     this._createPointLayer = function () {
       if (!this._pointLayer) {
-        this._pointLayer = L.geoJson();
+        this._pointLayer = L$1.geoJson();
         // store the feature ids that have already been added to the map
         this._pointLayerIds = {};
 
@@ -1068,21 +1656,32 @@
           var popupFunction = function (feature, layer) {
             layer.bindPopup(this._popup(feature, layer), this._popupOptions);
           };
-          this._pointLayer.options.onEachFeature = L.Util.bind(popupFunction, this);
+          this._pointLayer.options.onEachFeature = L$1.Util.bind(popupFunction, this);
         }
       }
     };
 
     this.createNewLayer = function (geojson) {
-      var fLayer = L.GeoJSON.geometryToLayer(geojson, this.options);
+      var fLayer = L$1.GeoJSON.geometryToLayer(geojson, this.options);
+
+      // Add arrow markers to line features.
+      if (fLayer && this._renderer) {
+        fLayer._esriArrowDecorator = attachArrowMarker(
+          fLayer,
+          geojson,
+          this._renderer,
+        );
+      }
 
       // add a point layer when the polygon is represented as proportional marker symbols
       if (this._hasProportionalSymbols) {
         var centroid = this.getPolygonCentroid(geojson.geometry.coordinates);
+
         if (!(isNaN(centroid[0]) || isNaN(centroid[0]))) {
           this._createPointLayer();
 
           var featureId = geojson.id.toString();
+
           // only add the feature if it does not already exist on the map
           if (!this._pointLayerIds[featureId]) {
             var pointjson = this.getPointJson(geojson, centroid);
@@ -1094,6 +1693,7 @@
           this._pointLayer.bringToFront();
         }
       }
+
       return fLayer;
     };
 
@@ -1112,10 +1712,11 @@
       var f;
 
       for (var i = 0, j = nPts - 1; i < nPts; j = i++) {
-        p1 = pts[i]; p2 = pts[j];
+        p1 = pts[i];
+        p2 = pts[j];
         twicearea += p1[0] * p2[1];
         twicearea -= p1[1] * p2[0];
-        f = (p1[0] * p2[1]) - (p2[0] * p1[1]);
+        f = p1[0] * p2[1] - p2[0] * p1[1];
         x += (p1[0] + p2[0]) * f;
         y += (p1[1] + p2[1]) * f;
       }
@@ -1125,26 +1726,26 @@
 
     this.getPointJson = function (geojson, centroid) {
       return {
-        type: 'Feature',
+        type: "Feature",
         properties: geojson.properties,
         id: geojson.id,
         geometry: {
-          type: 'Point',
-          coordinates: [centroid[0], centroid[1]]
-        }
+          type: "Point",
+          coordinates: [centroid[0], centroid[1]],
+        },
       };
     };
 
     this._checkForProportionalSymbols = function (geometryType, renderer) {
       this._hasProportionalSymbols = false;
-      if (geometryType === 'esriGeometryPolygon') {
+      if (geometryType === "esriGeometryPolygon") {
         if (renderer.backgroundFillSymbol) {
           this._hasProportionalSymbols = true;
         }
         // check to see if the first symbol in the classbreaks is a marker symbol
         if (renderer.classBreakInfos && renderer.classBreakInfos.length) {
           var sym = renderer.classBreakInfos[0].symbol;
-          if (sym && (sym.type === 'esriSMS' || sym.type === 'esriPMS')) {
+          if (sym && (sym.type === "esriSMS" || sym.type === "esriPMS")) {
             this._hasProportionalSymbols = true;
           }
         }
@@ -1156,7 +1757,7 @@
       var rendererInfo = serviceInfo.drawingInfo.renderer;
 
       var options = {
-        url: this.options.url
+        url: this.options.url,
       };
 
       if (this.options.token) {
@@ -1176,8 +1777,11 @@
       }
 
       switch (rendererInfo.type) {
-        case 'classBreaks':
-          this._checkForProportionalSymbols(serviceInfo.geometryType, rendererInfo);
+        case "classBreaks":
+          this._checkForProportionalSymbols(
+            serviceInfo.geometryType,
+            rendererInfo,
+          );
           if (this._hasProportionalSymbols) {
             this._createPointLayer();
             var pRend = classBreaksRenderer(rendererInfo, options);
@@ -1186,19 +1790,24 @@
           }
           rend = classBreaksRenderer(rendererInfo, options);
           break;
-        case 'uniqueValue':
+        case "uniqueValue":
           rend = uniqueValueRenderer(rendererInfo, options);
           break;
         default:
           rend = simpleRenderer(rendererInfo, options);
       }
+      this._renderer = rend;
+
       rend.attachStylesToLayer(this);
     };
   }
 
   EsriLeaflet__namespace.FeatureLayer.addInitHook(wireUpRenderers);
 
-  if (typeof EsriLeafletCluster__default["default"] !== 'undefined' && EsriLeafletCluster.FeatureLayer) {
+  if (
+    typeof EsriLeafletCluster__default["default"] !== "undefined" &&
+    EsriLeafletCluster.FeatureLayer
+  ) {
     EsriLeafletCluster.FeatureLayer.addInitHook(wireUpRenderers);
   }
 
@@ -1217,7 +1826,7 @@
   var peerDependencies = {
   	"esri-leaflet": "3.x",
   	leaflet: "1.x",
-  	"leaflet-shape-markers": "github:ryaa/Leaflet.shapeMarkers#bugfix/containsPoint-is-not-function-error"
+  	"leaflet-shape-markers": "1.x"
   };
   var optionalDependencies = {
   	"esri-leaflet-cluster": "^3.0.0"
@@ -1239,7 +1848,7 @@
   	"karma-mocha-reporter": "^2.2.5",
   	"karma-sourcemap-loader": "^0.3.8",
   	leaflet: "1.x",
-  	"leaflet-shape-markers": "github:ryaa/Leaflet.shapeMarkers#bugfix/containsPoint-is-not-function-error",
+  	"leaflet-shape-markers": "github:ryaa/Leaflet.shapeMarkers",
   	mkdirp: "^1.0.4",
   	mocha: "^10.2.0",
   	"npm-run-all": "^4.1.5",
@@ -1293,6 +1902,9 @@
   	test: "npm run lint && karma start",
   	"test:ci": "npm run lint && karma start --browsers Chrome_travis_ci"
   };
+  var dependencies = {
+  	"leaflet-polylinedecorator": "^1.6.0"
+  };
   var packageInfo = {
   	name: name,
   	description: description,
@@ -1314,7 +1926,8 @@
   	browser: browser,
   	readmeFilename: readmeFilename,
   	repository: repository,
-  	scripts: scripts
+  	scripts: scripts,
+  	dependencies: dependencies
   };
 
   var version = packageInfo.version;
